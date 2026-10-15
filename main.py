@@ -32,15 +32,17 @@ class CadastroProdutoPayload(BaseModel):
     aplicacao: str
     codigos_cruzados: str
     componentes: List[ComponenteItem]
+    sobrescrever: Optional[bool] = False
 
 def limpar_codigo(texto: str) -> str:
-    return re.sub(r'[^A-ZA-Z0-9]', '', texto).upper()
+    if not texto or texto.lower() == 'nan':
+        return ""
+    return re.sub(r'[^A-ZA-Z0-9]', '', str(texto)).upper()
 
-# --- ROTA PARA BAIXAR A PLANILHA MODELO EM EXCEL ---
 @app.get("/api/download-modelo")
 def download_modelo():
     data = [{
-        "codigo_peca": "ZEN31005",
+        "codigo_peca": "0001109300",
         "marca": "ZEN",
         "aplicacao": "FORD F250 CUMMINS",
         "codigos_cruzados": "0001223505, F000AL0151, EU20571, 2C3511001BA, ZM8013006",
@@ -70,16 +72,9 @@ def download_modelo():
         df.to_excel(writer, index=False, sheet_name='Modelo_CODIPEL')
     output.seek(0)
     
-    headers = {
-        'Content-Disposition': 'attachment; filename="Modelo_Importacao_CODIPEL.xlsx"'
-    }
-    return StreamingResponse(
-        output, 
-        headers=headers, 
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    headers = {'Content-Disposition': 'attachment; filename="Modelo_Importacao_CODIPEL.xlsx"'}
+    return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-# --- ROTA DE BUSCA BIDIRECIONAL ---
 @app.get("/api/catalogo/buscar/{termo}")
 def buscar_geral(termo: str):
     termo_limpo = limpar_codigo(termo)
@@ -155,35 +150,67 @@ def buscar_geral(termo: str):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- ROTA DE CADASTRO MANUAL ---
 @app.post("/api/cadastrar")
 def cadastrar_completo(payload: CadastroProdutoPayload):
     conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cod_peca = payload.codigo_peca.strip().upper()
+        marca = payload.marca.strip().upper()
+        aplicacao = payload.aplicacao.strip().upper()
+        codigos_cruzados = payload.codigos_cruzados.strip().upper()
+
+        cursor.execute("SELECT * FROM tb_produto WHERE UPPER(codigo_peca) = %s;", (cod_peca,))
+        existente = cursor.fetchone()
+
+        if existente and not payload.sobrescrever:
+            # Verifica se há divergência de dados
+            if existente['marca'] != marca or existente['aplicacao'] != aplicacao:
+                cursor.close()
+                conn.close()
+                return {
+                    "status": "CONFLITO_DUPLICADO",
+                    "mensagem": "Este produto já existe no banco de dados com informações diferentes.",
+                    "dados_antigos": existente,
+                    "dados_novos": {
+                        "codigo_peca": cod_peca,
+                        "marca": marca,
+                        "aplicacao": aplicacao,
+                        "codigos_cruzados": codigos_cruzados
+                    }
+                }
+
+        # Insere ou atualiza o produto principal
         cursor.execute("""
             INSERT INTO tb_produto (codigo_peca, marca, aplicacao, codigos_cruzados)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (codigo_peca) DO UPDATE 
-            SET marca = EXCLUDED.marca, aplicacao = EXCLUDED.aplicacao, codigos_cruzados = EXCLUDED.codigos_cruzados
+            SET marca = EXCLUDED.marca, 
+                aplicacao = EXCLUDED.aplicacao, 
+                codigos_cruzados = COALESCE(tb_produto.codigos_cruzados, '') || ', ' || EXCLUDED.codigos_cruzados
             RETURNING id_produto;
-        """, (payload.codigo_peca, payload.marca, payload.aplicacao, payload.codigos_cruzados))
+        """, (cod_peca, marca, aplicacao, codigos_cruzados))
         
-        id_produto = cursor.fetchone()[0]
+        id_produto = cursor.fetchone()['id_produto']
 
+        # Processa os componentes sem apagar os existentes
         for item in payload.componentes:
-            if not item.codigo_peca.strip():
+            c_cod = item.codigo_peca.strip().upper()
+            if not c_cod:
                 continue
+
+            c_tipo = item.tipo.strip()
+            c_marca = item.marca.strip().upper()
 
             cursor.execute("""
                 INSERT INTO tb_componente (tipo, codigo_peca, marca, codigos_cruzados)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (codigo_peca) DO UPDATE
-                SET marca = EXCLUDED.marca
+                SET marca = CASE WHEN EXCLUDED.marca != '' THEN EXCLUDED.marca ELSE tb_componente.marca END
                 RETURNING id_componente;
-            """, (item.tipo, item.codigo_peca, item.marca, item.codigos_cruzados))
+            """, (c_tipo, c_cod, c_marca, ""))
             
-            id_componente = cursor.fetchone()[0]
+            id_componente = cursor.fetchone()['id_componente']
 
             cursor.execute("""
                 INSERT INTO tb_produto_componente (id_produto, id_componente)
@@ -194,7 +221,7 @@ def cadastrar_completo(payload: CadastroProdutoPayload):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"mensagem": "Produto e componentes salvos com sucesso!"}
+        return {"status": "SUCESSO", "mensagem": "Produto e componentes salvos e unificados com sucesso!"}
 
     except Exception as e:
         conn.rollback()
@@ -202,23 +229,25 @@ def cadastrar_completo(payload: CadastroProdutoPayload):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- ROTA DE IMPORTAÇÃO EM LOTE VIA EXCEL / CSV ---
 @app.post("/api/cadastrar-lote")
 async def cadastrar_lote(file: UploadFile = File(...)):
     try:
         contents = await file.read()
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
         
+        # dtype=str Garante que zeros à esquerda não sejam apagados
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents), dtype=str)
+        else:
+            df = pd.read_excel(io.BytesIO(contents), dtype=str)
+        
+        # Converte tudo para texto limpo e MAIÚSCULO
+        df = df.fillna("").astype(str)
         df.columns = df.columns.str.strip().str.lower()
         
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         total_processados = 0
-        
         mapa_componentes = {
             'bendix': 'Bendix / Impulsor',
             'rele_partida': 'Relé Partida',
@@ -242,37 +271,34 @@ async def cadastrar_lote(file: UploadFile = File(...)):
         }
 
         for _, row in df.iterrows():
-            codigo_peca = str(row.get('codigo_peca', '')).strip()
-            if not codigo_peca or codigo_peca.lower() == 'nan':
+            codigo_peca = str(row.get('codigo_peca', '')).strip().upper()
+            if not codigo_peca or codigo_peca == 'NAN':
                 continue
                 
-            marca = str(row.get('marca', '')).strip()
-            if marca.lower() == 'nan': marca = ""
-            
-            aplicacao = str(row.get('aplicacao', '')).strip()
-            if aplicacao.lower() == 'nan': aplicacao = ""
-            
-            codigos_cruzados = str(row.get('codigos_cruzados', '')).strip()
-            if codigos_cruzados.lower() == 'nan': codigos_cruzados = ""
+            marca = str(row.get('marca', '')).strip().upper()
+            aplicacao = str(row.get('aplicacao', '')).strip().upper()
+            codigos_cruzados = str(row.get('codigos_cruzados', '')).strip().upper()
             
             cursor.execute("""
                 INSERT INTO tb_produto (codigo_peca, marca, aplicacao, codigos_cruzados)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (codigo_peca) DO UPDATE 
-                SET marca = EXCLUDED.marca, aplicacao = EXCLUDED.aplicacao, codigos_cruzados = EXCLUDED.codigos_cruzados
+                SET marca = CASE WHEN EXCLUDED.marca != '' THEN EXCLUDED.marca ELSE tb_produto.marca END,
+                    aplicacao = CASE WHEN EXCLUDED.aplicacao != '' THEN EXCLUDED.aplicacao ELSE tb_produto.aplicacao END,
+                    codigos_cruzados = COALESCE(tb_produto.codigos_cruzados, '') || ', ' || EXCLUDED.codigos_cruzados
                 RETURNING id_produto;
             """, (codigo_peca, marca, aplicacao, codigos_cruzados))
             id_produto = cursor.fetchone()[0]
             
             for col_excel, tipo_nome in mapa_componentes.items():
                 if col_excel in df.columns:
-                    cod_comp = str(row.get(col_excel, '')).strip()
-                    if cod_comp and cod_comp.lower() != 'nan':
+                    cod_comp = str(row.get(col_excel, '')).strip().upper()
+                    if cod_comp and cod_comp != 'NAN':
                         cursor.execute("""
                             INSERT INTO tb_componente (tipo, codigo_peca, marca, codigos_cruzados)
                             VALUES (%s, %s, %s, %s)
                             ON CONFLICT (codigo_peca) DO UPDATE
-                            SET marca = EXCLUDED.marca
+                            SET marca = CASE WHEN EXCLUDED.marca != '' THEN EXCLUDED.marca ELSE tb_componente.marca END
                             RETURNING id_componente;
                         """, (tipo_nome, cod_comp, marca, ""))
                         id_componente = cursor.fetchone()[0]
@@ -289,7 +315,7 @@ async def cadastrar_lote(file: UploadFile = File(...)):
         cursor.close()
         conn.close()
         
-        return {"mensagem": f"Importação concluída com sucesso! {total_processados} produtos inseridos e vinculados."}
+        return {"mensagem": f"Importação em lote concluída! {total_processados} produtos processados e mesclados com sucesso."}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro no processamento do ficheiro: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro na importação: {str(e)}")

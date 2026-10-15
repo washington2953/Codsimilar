@@ -16,7 +16,7 @@
 
     <div class="max-w-5xl mx-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden">
         
-        <!-- Cabeçalho com Logo Maior da CODIPEL -->
+        <!-- Cabeçalho -->
         <div class="bg-slate-950 p-6 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-5">
                 <img src="logo.png" alt="CODIPEL" class="h-20 md:h-24 object-contain bg-white p-2 rounded-lg shadow-md">
@@ -37,14 +37,14 @@
         </div>
 
         <div class="p-6">
-            <!-- ================= ABA DE CONSULTA ================= -->
+            <!-- ABA CONSULTA -->
             <div id="secaoBusca">
                 <div class="mb-6">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                         Digite qualquer código (Original, Paralelo ou Componente):
                     </label>
                     <div class="flex gap-2">
-                        <input type="text" id="inputCodigo" placeholder="Ex: F000AL0309, ZM0735, ZEN31010..." 
+                        <input type="text" id="inputCodigo" placeholder="Ex: F000AL0309, ZM0735, 0001109300..." 
                                class="flex-1 bg-slate-800 border border-slate-600 focus:border-red-500 text-white p-3 rounded-lg focus:outline-none text-lg">
                         <button onclick="buscar()" class="bg-red-600 hover:bg-red-700 text-white px-8 font-bold rounded-lg transition shadow-lg">
                             Buscar
@@ -58,10 +58,8 @@
                 </div>
             </div>
 
-            <!-- ================= ABA DE CADASTRO & IMPORTAÇÃO ================= -->
+            <!-- ABA CADASTRO -->
             <div id="secaoCadastro" class="hidden space-y-8">
-                
-                <!-- ÁREA DE IMPORTAÇÃO POR EXCEL / CSV -->
                 <div class="bg-blue-950/40 p-5 rounded-lg border border-blue-600/50">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-3 border-b border-blue-800/60">
                         <div>
@@ -69,11 +67,9 @@
                                 🚀 Importação Rápida em Lote (Excel / CSV)
                             </h2>
                             <p class="text-xs text-slate-300 mt-1">
-                                Carregue uma folha de cálculo para cadastrar centenas de produtos e componentes de uma só vez.
+                                Carregue uma planilha para cadastrar centenas de produtos mantendo zeros e maiúsculas automaticamente.
                             </p>
                         </div>
-                        
-                        <!-- BOTÃO DE DOWNLOAD DO MODELO -->
                         <a href="https://codsimilar.onrender.com/api/download-modelo" target="_blank" 
                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 border border-emerald-500/50 transition shadow-md whitespace-nowrap">
                             📥 Baixar Planilha Modelo (.xlsx)
@@ -90,7 +86,7 @@
                     <div id="msgLoteStatus" class="hidden mt-3 p-3 rounded-lg text-center font-bold text-sm"></div>
                 </div>
 
-                <!-- CADASTRO MANUAL UNITÁRIO -->
+                <!-- FORMULARIO MANUAL -->
                 <form id="formCadastro" onsubmit="salvarCadastro(event)">
                     <div class="bg-slate-800/60 p-5 rounded-lg border border-slate-700 mb-6">
                         <h2 class="text-base font-bold text-red-500 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
@@ -99,20 +95,20 @@
                         <div class="grid md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Código da Peça (Único)*</label>
-                                <input type="text" id="cadCodigoPeca" placeholder="Ex: ZEN31005" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadCodigoPeca" required placeholder="Ex: ZEN31005" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white uppercase">
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Marca*</label>
-                                <input type="text" id="cadMarca" placeholder="Ex: ZEN, BOSCH, ZM" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadMarca" required placeholder="Ex: ZEN, BOSCH, ZM" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white uppercase">
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Aplicação*</label>
-                                <input type="text" id="cadAplicacao" placeholder="Ex: FORD F250 CUMMINS" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadAplicacao" required placeholder="Ex: FORD F250 CUMMINS" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white uppercase">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-300 mb-1">Códigos Originais / Equivalentes Cruzados (Separados por vírgula)</label>
-                            <input type="text" id="cadCruzados" placeholder="Ex: 0001223505, F000AL0151, EU20571" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white font-mono text-sm">
+                            <input type="text" id="cadCruzados" placeholder="Ex: 0001223505, F000AL0151, EU20571" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white font-mono text-sm uppercase">
                         </div>
                     </div>
 
@@ -128,6 +124,40 @@
                     </button>
                     <div id="msgStatusCad" class="hidden mt-4 p-4 rounded-lg text-center font-bold"></div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ALERTA DE DUPLICADOS -->
+    <div id="modalConflito" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold text-yellow-400 flex items-center gap-2">
+                ⚠️ Produto Duplicado Encontrado
+            </h3>
+            <p class="text-xs text-slate-300">
+                Este código já está registrado no banco de dados com informações diferentes. Como deseja prosseguir?
+            </p>
+            
+            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div>
+                    <span class="font-bold text-red-400 block border-b border-slate-800 pb-1 mb-1">DADOS ATUAIS NO BANCO</span>
+                    <p id="confAntigoMarca"></p>
+                    <p id="confAntigoAplicacao"></p>
+                </div>
+                <div>
+                    <span class="font-bold text-green-400 block border-b border-slate-800 pb-1 mb-1">NOVOS DADOS ENVIADOS</span>
+                    <p id="confNovoMarca"></p>
+                    <p id="confNovoAplicacao"></p>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="resolverConflito(false)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                    🔵 Manter Dado Atual
+                </button>
+                <button onclick="resolverConflito(true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                    🔴 Substituir Dados
+                </button>
             </div>
         </div>
     </div>
@@ -150,8 +180,8 @@
                     <span class="text-xs font-bold text-slate-300 block">${tipo}</span>
                     <input type="hidden" class="comp-tipo" value="${tipo}">
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" placeholder="Código Peça (Ex: ZM0735)" class="comp-codigo bg-slate-800 border border-slate-600 p-1.5 rounded text-xs text-white">
-                        <input type="text" placeholder="Marca (Ex: ZM)" class="comp-marca bg-slate-800 border border-slate-600 p-1.5 rounded text-xs text-white">
+                        <input type="text" placeholder="Código Peça" class="comp-codigo bg-slate-800 border border-slate-600 p-1.5 rounded text-xs text-white uppercase">
+                        <input type="text" placeholder="Marca" class="comp-marca bg-slate-800 border border-slate-600 p-1.5 rounded text-xs text-white uppercase">
                     </div>
                 </div>
             `).join('');
@@ -161,14 +191,8 @@
         function trocarAba(aba) {
             document.getElementById('secaoBusca').classList.toggle('hidden', aba !== 'busca');
             document.getElementById('secaoCadastro').classList.toggle('hidden', aba !== 'cadastro');
-            
-            document.getElementById('tabBusca').className = aba === 'busca' 
-                ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
-                : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
-                
-            document.getElementById('tabCad').className = aba === 'cadastro' 
-                ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
-                : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
+            document.getElementById('tabBusca').className = aba === 'busca' ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow" : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
+            document.getElementById('tabCad').className = aba === 'cadastro' ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow" : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
         }
 
         async function buscar(codigoEspecifico = null) {
@@ -198,7 +222,6 @@
                                     </div>
                                 </div>
                                 <p class="text-xs text-slate-400 mb-4 font-mono"><strong>Códigos Cruzados:</strong> ${p.codigos_cruzados || 'Nenhum'}</p>
-                                
                                 <h4 class="text-xs font-bold uppercase text-slate-300 mb-2 border-b border-slate-700 pb-1">Componentes / Vista Explodida:</h4>
                                 <div class="grid md:grid-cols-2 gap-2">
                                     ${item.componentes.map(c => `
@@ -217,7 +240,6 @@
                                 <span class="text-xs font-bold text-blue-400 uppercase tracking-widest">Componente Encontrado</span>
                                 <h3 class="text-xl font-bold text-white">${c.tipo}: ${c.codigo_peca} (${c.marca})</h3>
                                 <p class="text-xs text-slate-300 mb-4">Aplica-se nos seguintes Produtos Principais:</p>
-                                
                                 <div class="space-y-2">
                                     ${item.aplicado_em_produtos.map(p => `
                                         <div onclick="buscar('${p.codigo_peca}')" class="bg-slate-900 hover:bg-slate-950 p-3 rounded border border-slate-700 cursor-pointer flex justify-between items-center transition">
@@ -258,11 +280,7 @@
             status.classList.remove('hidden');
 
             try {
-                const res = await fetch(`${API_URL}/api/cadastrar-lote`, {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const res = await fetch(`${API_URL}/api/cadastrar-lote`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Erro no envio");
 
@@ -275,8 +293,10 @@
             }
         }
 
-        async function salvarCadastro(e) {
-            e.preventDefault();
+        let payloadPendente = null;
+
+        async function salvarCadastro(e, sobrescrever = false) {
+            if (e) e.preventDefault();
             const msgStatus = document.getElementById('msgStatusCad');
             msgStatus.classList.add('hidden');
 
@@ -285,19 +305,19 @@
                 const tipo = div.querySelector('.comp-tipo').value;
                 const codigo_peca = div.querySelector('.comp-codigo').value.trim();
                 const marca = div.querySelector('.comp-marca').value.trim();
-
-                if (codigo_peca) {
-                    componentes.push({ tipo, codigo_peca, marca, codigos_cruzados: "" });
-                }
+                if (codigo_peca) componentes.push({ tipo, codigo_peca, marca, codigos_cruzados: "" });
             });
 
-            const payload = {
+            const payload = payloadPendente || {
                 codigo_peca: document.getElementById('cadCodigoPeca').value.trim(),
                 marca: document.getElementById('cadMarca').value.trim(),
                 aplicacao: document.getElementById('cadAplicacao').value.trim(),
                 codigos_cruzados: document.getElementById('cadCruzados').value.trim(),
-                componentes: componentes
+                componentes: componentes,
+                sobrescrever: sobrescrever
             };
+
+            payload.sobrescrever = sobrescrever;
 
             try {
                 const res = await fetch(`${API_URL}/api/cadastrar`, {
@@ -306,18 +326,36 @@
                     body: JSON.stringify(payload)
                 });
 
+                const data = await res.json();
+
+                if (data.status === "CONFLITO_DUPLICADO") {
+                    payloadPendente = payload;
+                    document.getElementById('confAntigoMarca').innerText = `Marca: ${data.dados_antigos.marca}`;
+                    document.getElementById('confAntigoAplicacao').innerText = `Aplicação: ${data.dados_antigos.aplicacao}`;
+                    document.getElementById('confNovoMarca').innerText = `Marca: ${data.dados_novos.marca}`;
+                    document.getElementById('confNovoAplicacao').innerText = `Aplicação: ${data.dados_novos.aplicacao}`;
+                    document.getElementById('modalConflito').classList.remove('hidden');
+                    return;
+                }
+
                 if (!res.ok) throw new Error();
 
-                msgStatus.innerText = "Produto e componentes salvos com sucesso!";
+                msgStatus.innerText = data.mensagem || "Produto salvo com sucesso!";
                 msgStatus.className = "mt-4 p-4 rounded-lg text-center font-bold bg-green-900/60 text-green-300 border border-green-500/50";
                 msgStatus.classList.remove('hidden');
                 document.getElementById('formCadastro').reset();
+                payloadPendente = null;
 
             } catch {
                 msgStatus.innerText = "Erro ao salvar no banco de dados.";
                 msgStatus.className = "mt-4 p-4 rounded-lg text-center font-bold bg-red-900/60 text-red-300 border border-red-500/50";
                 msgStatus.classList.remove('hidden');
             }
+        }
+
+        function resolverConflito(sobrescrever) {
+            document.getElementById('modalConflito').classList.add('hidden');
+            salvarCadastro(null, sobrescrever);
         }
     </script>
 </body>
