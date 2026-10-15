@@ -16,21 +16,21 @@
 
     <div class="max-w-5xl mx-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden">
         
-        <!-- Cabeçalho com Logo CODIPEL -->
+        <!-- Cabeçalho com Logo Maior da CODIPEL -->
         <div class="bg-slate-950 p-6 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <img src="logo.png" alt="CODIPEL" class="h-14 object-contain bg-white p-2 rounded shadow">
+            <div class="flex items-center gap-5">
+                <img src="logo.png" alt="CODIPEL" class="h-20 md:h-24 object-contain bg-white p-2 rounded-lg shadow-md">
                 <div>
-                    <h1 class="text-xl font-bold text-white tracking-wide">DISTRIBUIDORA DE PEÇAS</h1>
-                    <p class="text-xs text-slate-400">Sistema de Consulta e Cruzamento de Códigos</p>
+                    <h1 class="text-2xl font-black text-white tracking-wide">DISTRIBUIDORA DE PEÇAS</h1>
+                    <p class="text-xs text-slate-400 font-medium">Sistema de Consulta e Cruzamento de Códigos</p>
                 </div>
             </div>
             
             <div class="flex bg-slate-800/80 p-1 rounded-lg border border-slate-700">
-                <button id="tabBusca" onclick="trocarAba('busca')" class="px-5 py-2 rounded-md font-bold text-sm bg-blue-600 text-white shadow">
+                <button id="tabBusca" onclick="trocarAba('busca')" class="px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow">
                     Consultar Catálogo
                 </button>
-                <button id="tabCad" onclick="trocarAba('cadastro')" class="px-5 py-2 rounded-md font-bold text-sm text-slate-300 hover:text-white">
+                <button id="tabCad" onclick="trocarAba('cadastro')" class="px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white">
                     Cadastrar / Importar Excel
                 </button>
             </div>
@@ -63,12 +63,22 @@
                 
                 <!-- ÁREA DE IMPORTAÇÃO POR EXCEL / CSV -->
                 <div class="bg-blue-950/40 p-5 rounded-lg border border-blue-600/50">
-                    <h2 class="text-base font-bold text-blue-400 uppercase tracking-wider mb-2">
-                        🚀 Importação Rápida em Lote (Excel / CSV)
-                    </h2>
-                    <p class="text-xs text-slate-300 mb-4">
-                        Carregue uma folha de cálculo para cadastrar centenas de produtos e componentes de uma só vez.
-                    </p>
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-3 border-b border-blue-800/60">
+                        <div>
+                            <h2 class="text-base font-bold text-blue-400 uppercase tracking-wider">
+                                🚀 Importação Rápida em Lote (Excel / CSV)
+                            </h2>
+                            <p class="text-xs text-slate-300 mt-1">
+                                Carregue uma folha de cálculo para cadastrar centenas de produtos e componentes de uma só vez.
+                            </p>
+                        </div>
+                        
+                        <!-- BOTÃO DE DOWNLOAD DO MODELO -->
+                        <a href="https://codsimilar.onrender.com/api/download-modelo" target="_blank" 
+                           class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 border border-emerald-500/50 transition shadow-md whitespace-nowrap">
+                            📥 Baixar Planilha Modelo (.xlsx)
+                        </a>
+                    </div>
                     
                     <div class="flex flex-col md:flex-row gap-4 items-center">
                         <input type="file" id="ficheiroExcel" accept=".xlsx, .xls, .csv" 
@@ -153,12 +163,12 @@
             document.getElementById('secaoCadastro').classList.toggle('hidden', aba !== 'cadastro');
             
             document.getElementById('tabBusca').className = aba === 'busca' 
-                ? "px-5 py-2 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
-                : "px-5 py-2 rounded-md font-bold text-sm text-slate-300 hover:text-white";
+                ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
+                : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
                 
             document.getElementById('tabCad').className = aba === 'cadastro' 
-                ? "px-5 py-2 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
-                : "px-5 py-2 rounded-md font-bold text-sm text-slate-300 hover:text-white";
+                ? "px-5 py-2.5 rounded-md font-bold text-sm bg-blue-600 text-white shadow"
+                : "px-5 py-2.5 rounded-md font-bold text-sm text-slate-300 hover:text-white";
         }
 
         async function buscar(codigoEspecifico = null) {

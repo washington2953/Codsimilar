@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
@@ -34,6 +35,49 @@ class CadastroProdutoPayload(BaseModel):
 
 def limpar_codigo(texto: str) -> str:
     return re.sub(r'[^A-ZA-Z0-9]', '', texto).upper()
+
+# --- ROTA PARA BAIXAR A PLANILHA MODELO EM EXCEL ---
+@app.get("/api/download-modelo")
+def download_modelo():
+    data = [{
+        "codigo_peca": "ZEN31005",
+        "marca": "ZEN",
+        "aplicacao": "FORD F250 CUMMINS",
+        "codigos_cruzados": "0001223505, F000AL0151, EU20571, 2C3511001BA, ZM8013006",
+        "bendix": "ZEN1026",
+        "rele_partida": "ZM0735",
+        "rele_auxiliar": "",
+        "suporte_escova": "UF12234",
+        "induzido": "ZEN24037",
+        "bobina": "",
+        "bobina_carcaca": "ZM8930700",
+        "planetaria": "UF11111",
+        "reparo_planetaria": "",
+        "reparo_partida": "",
+        "reparo_parcial": "",
+        "garfo": "",
+        "mancal_acionamento": "ZM8930000",
+        "mancal_intermediario": "",
+        "mancal_coletor": "ZM893050",
+        "rolamento_1": "",
+        "rolamento_2": "",
+        "kit_bucha": "KT0138",
+        "pinhao": ""
+    }]
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Modelo_CODIPEL')
+    output.seek(0)
+    
+    headers = {
+        'Content-Disposition': 'attachment; filename="Modelo_Importacao_CODIPEL.xlsx"'
+    }
+    return StreamingResponse(
+        output, 
+        headers=headers, 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 # --- ROTA DE BUSCA BIDIRECIONAL ---
 @app.get("/api/catalogo/buscar/{termo}")
@@ -158,7 +202,7 @@ def cadastrar_completo(payload: CadastroProdutoPayload):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- NOVA ROTA DE IMPORTAÇÃO EM LOTE VIA EXCEL / CSV ---
+# --- ROTA DE IMPORTAÇÃO EM LOTE VIA EXCEL / CSV ---
 @app.post("/api/cadastrar-lote")
 async def cadastrar_lote(file: UploadFile = File(...)):
     try:
