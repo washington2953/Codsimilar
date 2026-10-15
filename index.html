@@ -8,7 +8,7 @@
     <style>
         body {
             background: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.95)), 
-                        url('watermarked_img_354911951354233204.jpg') center/cover no-repeat fixed;
+                        url('bg.jpg') center/cover no-repeat fixed;
         }
     </style>
 </head>
@@ -19,20 +19,19 @@
         <!-- Cabeçalho com Logo CODIPEL -->
         <div class="bg-slate-950 p-6 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-4">
-                <img src="CODIPEL LOGO NOVA 1000x1000.png" alt="CODIPEL" class="h-14 object-contain bg-white p-1 rounded">
+                <img src="logo.png" alt="CODIPEL" class="h-14 object-contain bg-white p-2 rounded shadow">
                 <div>
                     <h1 class="text-xl font-bold text-white tracking-wide">DISTRIBUIDORA DE PEÇAS</h1>
                     <p class="text-xs text-slate-400">Sistema de Consulta e Cruzamento de Códigos</p>
                 </div>
             </div>
             
-            <!-- Navegação de Abas -->
             <div class="flex bg-slate-800/80 p-1 rounded-lg border border-slate-700">
                 <button id="tabBusca" onclick="trocarAba('busca')" class="px-5 py-2 rounded-md font-bold text-sm bg-blue-600 text-white shadow">
                     Consultar Catálogo
                 </button>
                 <button id="tabCad" onclick="trocarAba('cadastro')" class="px-5 py-2 rounded-md font-bold text-sm text-slate-300 hover:text-white">
-                    Cadastrar Produto / Reparos
+                    Cadastrar / Importar Excel
                 </button>
             </div>
         </div>
@@ -53,51 +52,69 @@
                     </div>
                 </div>
 
-                <!-- Container de Resultados -->
                 <div id="areaResultados" class="space-y-6"></div>
                 <div id="msgErroBusca" class="hidden text-center p-6 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 font-medium">
                     Nenhum produto ou componente foi localizado com este código.
                 </div>
             </div>
 
-            <!-- ================= ABA DE CADASTRO ================= -->
-            <div id="secaoCadastro" class="hidden">
+            <!-- ================= ABA DE CADASTRO & IMPORTAÇÃO ================= -->
+            <div id="secaoCadastro" class="hidden space-y-8">
+                
+                <!-- ÁREA DE IMPORTAÇÃO POR EXCEL / CSV -->
+                <div class="bg-blue-950/40 p-5 rounded-lg border border-blue-600/50">
+                    <h2 class="text-base font-bold text-blue-400 uppercase tracking-wider mb-2">
+                        🚀 Importação Rápida em Lote (Excel / CSV)
+                    </h2>
+                    <p class="text-xs text-slate-300 mb-4">
+                        Carregue uma folha de cálculo para cadastrar centenas de produtos e componentes de uma só vez.
+                    </p>
+                    
+                    <div class="flex flex-col md:flex-row gap-4 items-center">
+                        <input type="file" id="ficheiroExcel" accept=".xlsx, .xls, .csv" 
+                               class="block w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        <button onclick="importarExcel()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-lg transition w-full md:w-auto text-sm whitespace-nowrap">
+                            Carregar Folha de Cálculo
+                        </button>
+                    </div>
+                    <div id="msgLoteStatus" class="hidden mt-3 p-3 rounded-lg text-center font-bold text-sm"></div>
+                </div>
+
+                <!-- CADASTRO MANUAL UNITÁRIO -->
                 <form id="formCadastro" onsubmit="salvarCadastro(event)">
                     <div class="bg-slate-800/60 p-5 rounded-lg border border-slate-700 mb-6">
                         <h2 class="text-base font-bold text-red-500 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
-                            1. Produto Principal (Motor de Partida / Alternador)
+                            Cadastro Manual Unitário
                         </h2>
                         <div class="grid md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Código da Peça (Único)*</label>
-                                <input type="text" id="cadCodigoPeca" required placeholder="Ex: ZEN31005" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadCodigoPeca" placeholder="Ex: ZEN31005" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Marca*</label>
-                                <input type="text" id="cadMarca" required placeholder="Ex: ZEN, BOSCH, ZM" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadMarca" placeholder="Ex: ZEN, BOSCH, ZM" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-300 mb-1">Aplicação*</label>
-                                <input type="text" id="cadAplicacao" required placeholder="Ex: FORD F250 CUMMINS" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
+                                <input type="text" id="cadAplicacao" placeholder="Ex: FORD F250 CUMMINS" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-300 mb-1">Códigos Originais / Equivalentes Cruzados (Separados por vírgula)</label>
-                            <input type="text" id="cadCruzados" placeholder="Ex: 0001223505, F000AL0151, EU20571, 2C3511001BA, ZM8013006" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white font-mono text-sm">
+                            <input type="text" id="cadCruzados" placeholder="Ex: 0001223505, F000AL0151, EU20571" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-white font-mono text-sm">
                         </div>
                     </div>
 
                     <div class="bg-slate-800/60 p-5 rounded-lg border border-slate-700 mb-6">
                         <h2 class="text-base font-bold text-blue-400 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
-                            2. Componentes / Reparos da Vista Explodida
+                            Componentes / Reparos da Vista Explodida
                         </h2>
-                        <div id="gridComponentes" class="grid md:grid-cols-2 gap-4">
-                            <!-- Inseridos dinamicamente via JS -->
-                        </div>
+                        <div id="gridComponentes" class="grid md:grid-cols-2 gap-4"></div>
                     </div>
 
                     <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg text-lg transition shadow-lg">
-                        Salvar Produto e Lista de Reparos no Banco
+                        Salvar Peça no Banco
                     </button>
                     <div id="msgStatusCad" class="hidden mt-4 p-4 rounded-lg text-center font-bold"></div>
                 </form>
@@ -116,10 +133,9 @@
             "Kit Bucha", "Pinhão"
         ];
 
-        // Monta os campos de componentes no cadastro automaticamente
         function carregarCamposComponentes() {
             const grid = document.getElementById('gridComponentes');
-            grid.innerHTML = TIPOS_COMPONENTES.map((tipo, index) => `
+            grid.innerHTML = TIPOS_COMPONENTES.map((tipo) => `
                 <div class="bg-slate-900/80 p-3 rounded border border-slate-700/80 space-y-2">
                     <span class="text-xs font-bold text-slate-300 block">${tipo}</span>
                     <input type="hidden" class="comp-tipo" value="${tipo}">
@@ -212,6 +228,43 @@
             }
         }
 
+        async function importarExcel() {
+            const input = document.getElementById('ficheiroExcel');
+            const status = document.getElementById('msgLoteStatus');
+            status.classList.add('hidden');
+
+            if (!input.files || input.files.length === 0) {
+                status.innerText = "Por favor, selecione um ficheiro Excel (.xlsx) ou CSV.";
+                status.className = "mt-3 p-3 rounded-lg text-center font-bold text-sm bg-red-900/60 text-red-300 border border-red-500/50";
+                status.classList.remove('hidden');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+
+            status.innerText = "A carregar e processar ficheiro...";
+            status.className = "mt-3 p-3 rounded-lg text-center font-bold text-sm bg-blue-900/60 text-blue-300 border border-blue-500/50";
+            status.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API_URL}/api/cadastrar-lote`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Erro no envio");
+
+                status.innerText = data.mensagem;
+                status.className = "mt-3 p-3 rounded-lg text-center font-bold text-sm bg-green-900/60 text-green-300 border border-green-500/50";
+                input.value = "";
+            } catch (err) {
+                status.innerText = err.message || "Erro ao importar folha de cálculo.";
+                status.className = "mt-3 p-3 rounded-lg text-center font-bold text-sm bg-red-900/60 text-red-300 border border-red-500/50";
+            }
+        }
+
         async function salvarCadastro(e) {
             e.preventDefault();
             const msgStatus = document.getElementById('msgStatusCad');
@@ -245,7 +298,7 @@
 
                 if (!res.ok) throw new Error();
 
-                msgStatus.innerText = "Produto e componentes cadastrados e vinculados com sucesso!";
+                msgStatus.innerText = "Produto e componentes salvos com sucesso!";
                 msgStatus.className = "mt-4 p-4 rounded-lg text-center font-bold bg-green-900/60 text-green-300 border border-green-500/50";
                 msgStatus.classList.remove('hidden');
                 document.getElementById('formCadastro').reset();

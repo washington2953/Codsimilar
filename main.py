@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from typing import List, Optional
 import re
+import pandas as pd
+import io
 
 app = FastAPI()
 
@@ -17,7 +19,6 @@ app.add_middleware(
 
 DATABASE_URL = "postgresql://neondb_owner:npg_dNsSVOkp9o0D@ep-delicate-mode-b68ihg88-pooler.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
-# --- MODELOS DE DADOS PARA CADASTRO ---
 class ComponenteItem(BaseModel):
     tipo: str
     codigo_peca: str
@@ -31,7 +32,6 @@ class CadastroProdutoPayload(BaseModel):
     codigos_cruzados: str
     componentes: List[ComponenteItem]
 
-# Função para higienizar texto de busca
 def limpar_codigo(texto: str) -> str:
     return re.sub(r'[^A-ZA-Z0-9]', '', texto).upper()
 
@@ -46,7 +46,6 @@ def buscar_geral(termo: str):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        # 1. Tenta buscar nos PRODUTOS PRINCIPAIS (pelo código único ou lista de códigos cruzados)
         sql_produto = """
             SELECT id_produto, codigo_peca, marca, aplicacao, codigos_cruzados
             FROM tb_produto
@@ -57,7 +56,6 @@ def buscar_geral(termo: str):
         cursor.execute(sql_produto, (param, param))
         produtos_encontrados = cursor.fetchall()
 
-        # Se encontrou produtos principais, traz os detalhes e a lista de componentes de cada um
         if produtos_encontrados:
             resultados = []
             for prod in produtos_encontrados:
@@ -77,7 +75,6 @@ def buscar_geral(termo: str):
             conn.close()
             return resultados
 
-        # 2. Se não achou no Produto, busca nos COMPONENTES (ex: digitou código do Relé ZM0735)
         sql_componente = """
             SELECT id_componente, tipo, codigo_peca, marca, codigos_cruzados
             FROM tb_componente
@@ -88,7 +85,6 @@ def buscar_geral(termo: str):
         componentes_encontrados = cursor.fetchall()
 
         if componentes_encontrados:
-            # Para cada componente, descobre em quais produtos ele é aplicado
             resultados = []
             for comp in componentes_encontrados:
                 cursor.execute("""
@@ -115,13 +111,12 @@ def buscar_geral(termo: str):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- ROTA DE CADASTRO COMPLETO ---
+# --- ROTA DE CADASTRO MANUAL ---
 @app.post("/api/cadastrar")
 def cadastrar_completo(payload: CadastroProdutoPayload):
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     try:
-        # Insere ou recupera o Produto Principal
         cursor.execute("""
             INSERT INTO tb_produto (codigo_peca, marca, aplicacao, codigos_cruzados)
             VALUES (%s, %s, %s, %s)
@@ -132,23 +127,20 @@ def cadastrar_completo(payload: CadastroProdutoPayload):
         
         id_produto = cursor.fetchone()[0]
 
-        # Processa cada componente do formulário
         for item in payload.componentes:
             if not item.codigo_peca.strip():
                 continue
 
-            # Insere o componente (ou atualiza se já existir)
             cursor.execute("""
                 INSERT INTO tb_componente (tipo, codigo_peca, marca, codigos_cruzados)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (codigo_peca) DO UPDATE
-                SET marca = EXCLUDED.marca, codigos_cruzados = EXCLUDED.codigos_cruzados
+                SET marca = EXCLUDED.marca
                 RETURNING id_componente;
             """, (item.tipo, item.codigo_peca, item.marca, item.codigos_cruzados))
             
             id_componente = cursor.fetchone()[0]
 
-            # Vincula produto ao componente
             cursor.execute("""
                 INSERT INTO tb_produto_componente (id_produto, id_componente)
                 VALUES (%s, %s)
@@ -165,3 +157,95 @@ def cadastrar_completo(payload: CadastroProdutoPayload):
         cursor.close()
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- NOVA ROTA DE IMPORTAÇÃO EM LOTE VIA EXCEL / CSV ---
+@app.post("/api/cadastrar-lote")
+async def cadastrar_lote(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        df.columns = df.columns.str.strip().str.lower()
+        
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        
+        total_processados = 0
+        
+        mapa_componentes = {
+            'bendix': 'Bendix / Impulsor',
+            'rele_partida': 'Relé Partida',
+            'rele_auxiliar': 'Relé Auxiliar Partida',
+            'suporte_escova': 'Suporte Escova',
+            'induzido': 'Induzido',
+            'bobina': 'Bobina',
+            'bobina_carcaca': 'Bobina c/ Carcaça',
+            'planetaria': 'Planetária',
+            'reparo_planetaria': 'Reparo Planetária',
+            'reparo_partida': 'Reparo Partida',
+            'reparo_parcial': 'Reparo Parcial Partida',
+            'garfo': 'Garfo',
+            'mancal_acionamento': 'Mancal Acionamento',
+            'mancal_intermediario': 'Mancal Intermediário',
+            'mancal_coletor': 'Mancal Coletor',
+            'rolamento_1': 'Rolamento 1',
+            'rolamento_2': 'Rolamento 2',
+            'kit_bucha': 'Kit Bucha',
+            'pinhao': 'Pinhão'
+        }
+
+        for _, row in df.iterrows():
+            codigo_peca = str(row.get('codigo_peca', '')).strip()
+            if not codigo_peca or codigo_peca.lower() == 'nan':
+                continue
+                
+            marca = str(row.get('marca', '')).strip()
+            if marca.lower() == 'nan': marca = ""
+            
+            aplicacao = str(row.get('aplicacao', '')).strip()
+            if aplicacao.lower() == 'nan': aplicacao = ""
+            
+            codigos_cruzados = str(row.get('codigos_cruzados', '')).strip()
+            if codigos_cruzados.lower() == 'nan': codigos_cruzados = ""
+            
+            cursor.execute("""
+                INSERT INTO tb_produto (codigo_peca, marca, aplicacao, codigos_cruzados)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (codigo_peca) DO UPDATE 
+                SET marca = EXCLUDED.marca, aplicacao = EXCLUDED.aplicacao, codigos_cruzados = EXCLUDED.codigos_cruzados
+                RETURNING id_produto;
+            """, (codigo_peca, marca, aplicacao, codigos_cruzados))
+            id_produto = cursor.fetchone()[0]
+            
+            for col_excel, tipo_nome in mapa_componentes.items():
+                if col_excel in df.columns:
+                    cod_comp = str(row.get(col_excel, '')).strip()
+                    if cod_comp and cod_comp.lower() != 'nan':
+                        cursor.execute("""
+                            INSERT INTO tb_componente (tipo, codigo_peca, marca, codigos_cruzados)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (codigo_peca) DO UPDATE
+                            SET marca = EXCLUDED.marca
+                            RETURNING id_componente;
+                        """, (tipo_nome, cod_comp, marca, ""))
+                        id_componente = cursor.fetchone()[0]
+                        
+                        cursor.execute("""
+                            INSERT INTO tb_produto_componente (id_produto, id_componente)
+                            VALUES (%s, %s)
+                            ON CONFLICT DO NOTHING;
+                        """, (id_produto, id_componente))
+            
+            total_processados += 1
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"mensagem": f"Importação concluída com sucesso! {total_processados} produtos inseridos e vinculados."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro no processamento do ficheiro: {str(e)}")
