@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo & Cadastro de Peças</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8 font-sans text-gray-800">
+
+    <div class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <!-- Navegação por Abas -->
+        <div class="flex border-b mb-6">
+            <button id="abaBusca" onclick="trocarAba('busca')" class="py-2 px-4 font-bold border-b-2 border-blue-600 text-blue-600">
+                Consultar Catálogo
+            </button>
+            <button id="abaCadastro" onclick="trocarAba('cadastro')" class="py-2 px-4 font-bold text-gray-500 hover:text-blue-600">
+                Cadastrar Nova Peça
+            </button>
+        </div>
+
+        <!-- ================= TELA DE CONSULTA ================= -->
+        <div id="secaoBusca">
+            <div class="flex gap-2 mb-6">
+                <input type="text" id="inputCodigo" placeholder="Digite o código (ex: F000AL0112)" 
+                       class="flex-1 border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+                <button onclick="buscarPecas()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+                    Buscar
+                </button>
+            </div>
+
+            <div id="areaResultado" class="hidden">
+                <h2 id="nomeProduto" class="text-xl font-bold mb-4 bg-gray-50 p-3 border-l-4 border-blue-600"></h2>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 border-b-2 border-gray-200">
+                            <th class="p-3">Código Interno</th>
+                            <th class="p-3">Peça / Reparo</th>
+                            <th class="p-3 text-center">Qtd</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTabela"></tbody>
+                </table>
+            </div>
+            <div id="mensagemErro" class="hidden text-red-600 bg-red-50 p-4 rounded mt-4">
+                Peça não encontrada no banco de dados.
+            </div>
+        </div>
+
+        <!-- ================= TELA DE CADASTRO ================= -->
+        <div id="secaoCadastro" class="hidden">
+            <h2 class="text-lg font-bold mb-4 text-gray-700">Novo Produto Principal</h2>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <input type="text" id="cadDescricao" placeholder="Descrição (Ex: Motor de Partida 12V)" class="border p-2 rounded">
+                <input type="text" id="cadCodigoOriginal" placeholder="Código Original (Ex: F000AL0112)" class="border p-2 rounded">
+            </div>
+
+            <h3 class="text-md font-bold mb-2 text-gray-700">Componente / Reparo</h3>
+            <div class="grid grid-cols-3 gap-2 mb-6">
+                <input type="text" id="compNome" placeholder="Nome do Componente (Ex: Mancal)" class="border p-2 rounded">
+                <input type="text" id="compCodigo" placeholder="Código Prateleira (Ex: M100)" class="border p-2 rounded">
+                <input type="number" id="compQtd" placeholder="Quantidade" value="1" class="border p-2 rounded">
+            </div>
+
+            <button onclick="cadastrarPeca()" class="w-full bg-green-600 text-white py-3 rounded font-bold hover:bg-green-700 transition">
+                Salvar Peça no Banco
+            </button>
+
+            <div id="msgSucessoCad" class="hidden text-green-700 bg-green-100 p-3 rounded mt-4 text-center font-bold"></div>
+            <div id="msgErroCad" class="hidden text-red-700 bg-red-100 p-3 rounded mt-4 text-center font-bold"></div>
+        </div>
+    </div>
+
+    <script>
+        // COLE ABAIXO A URL DA SUA API NO RENDER
+        const API_URL = "https://codsimilar.onrender.com";
+
+        function trocarAba(aba) {
+            const secaoBusca = document.getElementById('secaoBusca');
+            const secaoCadastro = document.getElementById('secaoCadastro');
+            const btnBusca = document.getElementById('abaBusca');
+            const btnCad = document.getElementById('abaCadastro');
+
+            if (aba === 'busca') {
+                secaoBusca.classList.remove('hidden');
+                secaoCadastro.classList.add('hidden');
+                btnBusca.className = "py-2 px-4 font-bold border-b-2 border-blue-600 text-blue-600";
+                btnCad.className = "py-2 px-4 font-bold text-gray-500 hover:text-blue-600";
+            } else {
+                secaoBusca.classList.add('hidden');
+                secaoCadastro.classList.remove('hidden');
+                btnCad.className = "py-2 px-4 font-bold border-b-2 border-blue-600 text-blue-600";
+                btnBusca.className = "py-2 px-4 font-bold text-gray-500 hover:text-blue-600";
+            }
+        }
+
+        async function buscarPecas() {
+            const codigo = document.getElementById('inputCodigo').value;
+            const areaResultado = document.getElementById('areaResultado');
+            const corpoTabela = document.getElementById('corpoTabela');
+            const nomeProduto = document.getElementById('nomeProduto');
+            const mensagemErro = document.getElementById('mensagemErro');
+
+            areaResultado.classList.add('hidden');
+            mensagemErro.classList.add('hidden');
+            corpoTabela.innerHTML = '';
+
+            if (!codigo) return;
+
+            try {
+                const resposta = await fetch(`${API_URL}/api/catalogo/${codigo}`);
+                if (!resposta.ok) throw new Error();
+
+                const dados = await resposta.json();
+                nomeProduto.innerText = dados[0].produtoprincipal;
+
+                dados.forEach(item => {
+                    corpoTabela.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 font-mono text-sm">${item.codigopeca}</td>
+                            <td class="p-3">${item.subcomponente}</td>
+                            <td class="p-3 text-center font-bold">${item.quantidade}</td>
+                        </tr>
+                    `;
+                });
+                areaResultado.classList.remove('hidden');
+            } catch {
+                mensagemErro.classList.remove('hidden');
+            }
+        }
+
+        async function cadastrarPeca() {
+            const descricao = document.getElementById('cadDescricao').value;
+            const codigoOriginal = document.getElementById('cadCodigoOriginal').value;
+            const compNome = document.getElementById('compNome').value;
+            const compCodigo = document.getElementById('compCodigo').value;
+            const compQtd = parseInt(document.getElementById('compQtd').value) || 1;
+
+            const msgSucesso = document.getElementById('msgSucessoCad');
+            const msgErro = document.getElementById('msgErroCad');
+
+            msgSucesso.classList.add('hidden');
+            msgErro.classList.add('hidden');
+
+            if (!descricao || !codigoOriginal || !compNome || !compCodigo) {
+                msgErro.innerText = "Preencha todos os campos!";
+                msgErro.classList.remove('hidden');
+                return;
+            }
+
+            const payload = {
+                descricao: descricao,
+                codigo_original: codigoOriginal,
+                id_categoria: 1,
+                componentes: [
+                    {
+                        nome: compNome,
+                        codigo_referencia: compCodigo,
+                        quantidade: compQtd
+                    }
+                ]
+            };
+
+            try {
+                const resposta = await fetch(`${API_URL}/api/cadastrar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resposta.ok) throw new Error();
+
+                msgSucesso.innerText = "Produto e componentes cadastrados com sucesso!";
+                msgSucesso.classList.remove('hidden');
+
+                // Limpa os campos
+                document.getElementById('cadDescricao').value = '';
+                document.getElementById('cadCodigoOriginal').value = '';
+                document.getElementById('compNome').value = '';
+                document.getElementById('compCodigo').value = '';
+
+            } catch {
+                msgErro.innerText = "Erro ao cadastrar peça no banco de dados.";
+                msgErro.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
